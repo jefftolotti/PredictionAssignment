@@ -1,0 +1,116 @@
+---
+title: "Course 8 Prediciton Assignment"
+author: "Jeff Tolotti"
+date: "10/28/2017"
+output: html_document
+---
+
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+
+### Loading the necessary libraries
+
+Each of the below libraries will be needed in our analysis.
+
+```{r echo=FALSE}
+library(lattice)
+library(ggplot2)
+library(caret)
+library(kernlab)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+```
+
+### Reading the data
+
+The data has been downloaded from the links provided and saved in the current workspace. The below code reads the data into our data frames.
+
+```{r}
+
+training <- read.csv(file = 'pml-training.csv', row.names = 1, na.strings=c("NA","#DIV/0!",""))
+test <- read.csv(file = 'pml-testing.csv',row.names = 1, na.strings=c("NA","#DIV/0!",""))
+
+dim(training)
+
+```
+
+### Cleaning the data
+
+There is a lot of NA data in our data set, so we only want to use data that is relatively complete. For this analysis, we will select all variables that have less than 10% missing data.
+
+```{r}
+nsv <- nearZeroVar(training, saveMetrics = T)
+training <- training[, !nsv$nzv]
+
+training <- training[, colSums(is.na(training)) < nrow(training)*0.1]
+
+training <- training[,2:dim(training)[2]]
+```
+
+### Splitting the training data into a training set and a validation set
+
+We will use 70% of the data for training and 30% for validation.
+
+```{r}
+set.seed(26416528)
+inTrain <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+
+training <- training[inTrain,]
+crossValidation <- training[-inTrain,]
+
+```
+
+## Training the model using RandomForest
+
+Using the RandomForest algorithm, we train our model with all variables to predict the 'classe' variable.
+
+```{r}
+mfControl <- trainControl(method="cv", number=3, verboseIter=F)
+modFit <- train(classe ~ ., data=training, method="rf", trControl=mfControl)
+```
+
+## Evaluating the model
+
+We can now validate our data using the validation set. This gives us an accuracy rate for our model.
+
+```{r}
+pred_CV_RF <- predict(modFit, crossValidation)
+confusionMatrix(pred_CV_RF,crossValidation$classe)
+```
+
+The accuracy of our model is basically perfect. We can now use it to predict the test data.
+
+## Predicting test data
+
+```{r}
+pred_TEST_RF <- predict(modFit, test)
+pred_TEST_RF
+```
+
+The data has now been predicted.
+
+## Generating Files
+
+The last step is to output a file for each test question.
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(pred_TEST_RF)
+```
+
+
+
+
+
+
+
